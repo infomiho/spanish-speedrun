@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useCallback } from "react";
-import { toast } from "sonner";
-import { useSettingsStore } from "@/stores/settings";
+import { useMemo, useCallback } from "react";
 import { useProgressStore } from "@/stores/progress";
+import { useDayGuard } from "@/hooks/useDayGuard";
 import {
   getVocabForDay,
   getVocabUpToDay,
@@ -40,18 +39,11 @@ type QuizItem =
 function QuizPage() {
   const { dayId } = Route.useParams();
   const navigate = useNavigate();
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
   const recordAttempt = useProgressStore((s) => s.recordAttempt);
   const canTakeQuiz = useProgressStore((s) => s.canTakeQuiz);
 
   const dayNum = Number(dayId);
-
-  useEffect(() => {
-    if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
-      toast("Day not available yet");
-      navigate({ to: "/dashboard" });
-    }
-  }, [dayNum, currentDay, navigate]);
+  const allowed = useDayGuard(dayNum);
 
   const quizUnlocked = canTakeQuiz(dayNum);
 
@@ -170,7 +162,7 @@ function QuizPage() {
     onComplete: handleComplete,
   });
 
-  if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
+  if (!allowed) {
     return null;
   }
 

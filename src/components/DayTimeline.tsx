@@ -1,10 +1,10 @@
 import { useRef, useEffect } from "react";
-import { useSettingsStore } from "@/stores/settings";
+import { useCurrentDay } from "@/hooks/useCurrentDay";
 import { getAllDays } from "@/lib/curriculum";
 import { DayCard } from "@/components/DayCard";
 
 export function DayTimeline() {
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
+  const currentDay = useCurrentDay();
   const days = getAllDays();
   const currentRef = useRef<HTMLDivElement>(null);
 

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   BookOpen,
   Lightbulb,
@@ -9,12 +9,10 @@ import {
   CheckCircle,
   ChevronLeft,
 } from "lucide-react";
-import { toast } from "sonner";
-import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getDayPlan } from "@/lib/curriculum";
-import { useSettingsStore } from "@/stores/settings";
 import { useProgressStore } from "@/stores/progress";
+import { useDayGuard } from "@/hooks/useDayGuard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,22 +35,14 @@ const exerciseMeta: Record<
 
 function DayHubPage() {
   const { dayId } = Route.useParams();
-  const navigate = useNavigate();
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
   const getCompletion = useProgressStore((s) => s.getCompletion);
   const canTakeQuiz = useProgressStore((s) => s.canTakeQuiz);
 
   const dayNum = Number(dayId);
   const plan = getDayPlan(dayNum);
+  const allowed = useDayGuard(dayNum);
 
-  useEffect(() => {
-    if (!plan || dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
-      toast("Day not available yet");
-      navigate({ to: "/dashboard" });
-    }
-  }, [plan, dayNum, currentDay, navigate]);
-
-  if (!plan || dayNum > currentDay) {
+  if (!plan || !allowed) {
     return null;
   }
 

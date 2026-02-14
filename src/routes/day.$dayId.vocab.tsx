@@ -1,9 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useCallback } from "react";
-import { toast } from "sonner";
 import { getVocabForDay } from "@/lib/curriculum";
-import { useSettingsStore } from "@/stores/settings";
 import { useProgressStore } from "@/stores/progress";
+import { useDayGuard } from "@/hooks/useDayGuard";
 import { useSrsSession } from "@/hooks/useSrsSession";
 import { ExerciseShell } from "@/components/ExerciseShell";
 import { FlashCard } from "@/components/FlashCard";
@@ -20,18 +19,11 @@ export const Route = createFileRoute("/day/$dayId/vocab")({
 function VocabPage() {
   const { dayId } = Route.useParams();
   const navigate = useNavigate();
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
   const recordAttempt = useProgressStore((s) => s.recordAttempt);
 
   const dayNum = Number(dayId);
+  const allowed = useDayGuard(dayNum);
   const vocabForDay = getVocabForDay(dayNum);
-
-  useEffect(() => {
-    if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
-      toast("Day not available yet");
-      navigate({ to: "/dashboard" });
-    }
-  }, [dayNum, currentDay, navigate]);
 
   const handleComplete = useCallback(
     (result: SessionResult) => {
@@ -55,7 +47,7 @@ function VocabPage() {
     setIsFlipped(false);
   }, [index]);
 
-  if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
+  if (!allowed) {
     return null;
   }
 

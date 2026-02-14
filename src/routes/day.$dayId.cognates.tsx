@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useCallback, useState, useRef } from "react";
-import { toast } from "sonner";
+import { useMemo, useCallback, useState, useRef } from "react";
 import {
   getCognateRulesForDay,
   getFalseCognatesForDay,
@@ -8,8 +7,8 @@ import {
 } from "@/lib/curriculum";
 import { generateDistractors } from "@/lib/cognates";
 import { shuffle } from "@/lib/shuffle";
-import { useSettingsStore } from "@/stores/settings";
 import { useProgressStore } from "@/stores/progress";
+import { useDayGuard } from "@/hooks/useDayGuard";
 import { ExerciseShell } from "@/components/ExerciseShell";
 import { CognateRule } from "@/components/CognateRule";
 import { MultipleChoice } from "@/components/MultipleChoice";
@@ -119,17 +118,10 @@ function buildExerciseQueue(
 function CognatesPage() {
   const { dayId } = Route.useParams();
   const navigate = useNavigate();
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
   const recordAttempt = useProgressStore((s) => s.recordAttempt);
 
   const dayNum = Number(dayId);
-
-  useEffect(() => {
-    if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
-      toast("Day not available yet");
-      navigate({ to: "/dashboard" });
-    }
-  }, [dayNum, currentDay, navigate]);
+  const allowed = useDayGuard(dayNum);
 
   const rulesForDay = getCognateRulesForDay(dayNum);
   const falseCognatesForDay = getFalseCognatesForDay(dayNum);
@@ -188,7 +180,7 @@ function CognatesPage() {
     setIsComplete(false);
   }, []);
 
-  if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
+  if (!allowed) {
     return null;
   }
 

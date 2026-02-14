@@ -1,4 +1,4 @@
-import { useSettingsStore } from "@/stores/settings";
+import { useCurrentDay } from "@/hooks/useCurrentDay";
 
 function getSubtitle(day: number): string {
   if (day <= 1) return "Let's get started!";
@@ -10,7 +10,7 @@ function getSubtitle(day: number): string {
 }
 
 export function StreakCounter() {
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
+  const currentDay = useCurrentDay();
 
   return (
     <div className="text-center py-4">

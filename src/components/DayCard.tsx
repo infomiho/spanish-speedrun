@@ -5,7 +5,7 @@ import { ProgressRing } from "@/components/ProgressRing";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useProgressStore } from "@/stores/progress";
-import { useSettingsStore } from "@/stores/settings";
+import { useCurrentDay } from "@/hooks/useCurrentDay";
 import type { DayPlan } from "@/lib/types";
 
 interface DayCardProps {
@@ -13,7 +13,7 @@ interface DayCardProps {
 }
 
 export function DayCard({ plan }: DayCardProps) {
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
+  const currentDay = useCurrentDay();
   const percent = useProgressStore((s) => s.getDayCompletionPercent(plan.day));
 
   const isLocked = plan.day > currentDay;

@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { useSettingsStore } from "@/stores/settings";
 import { useProgressStore } from "@/stores/progress";
+import { useDayGuard } from "@/hooks/useDayGuard";
 import { getVerbsForDay, getVerbsUpToDay } from "@/lib/curriculum";
 import { shuffle } from "@/lib/shuffle";
 import { ExerciseShell } from "@/components/ExerciseShell";
@@ -30,22 +30,17 @@ const PRONOUNS: Pronoun[] = ["yo", "tú", "él"];
 function VerbsPage() {
   const { dayId } = Route.useParams();
   const navigate = useNavigate();
-  const currentDay = useSettingsStore((s) => s.getCurrentDay());
   const recordAttempt = useProgressStore((s) => s.recordAttempt);
 
   const dayNum = Number(dayId);
+  const allowed = useDayGuard(dayNum);
 
   useEffect(() => {
-    if (dayNum < 1 || dayNum > 10 || dayNum > currentDay) {
-      toast("Day not available yet");
-      navigate({ to: "/dashboard" });
-      return;
-    }
-    if (dayNum < 2) {
+    if (allowed && dayNum < 2) {
       toast("Verb practice starts on Day 2");
       navigate({ to: "/day/$dayId", params: { dayId: String(dayNum) } });
     }
-  }, [dayNum, currentDay, navigate]);
+  }, [allowed, dayNum, navigate]);
 
   const exercises = useMemo((): VerbExercise[] => {
     if (dayNum < 2) return [];
@@ -121,7 +116,7 @@ function VerbsPage() {
     onComplete: handleComplete,
   });
 
-  if (dayNum < 2 || dayNum > 10 || dayNum > currentDay) {
+  if (!allowed || dayNum < 2) {
     return null;
   }
 
