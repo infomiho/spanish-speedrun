@@ -1,14 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useCallback, useState, useRef } from "react";
+import { useMemo, useCallback } from "react";
 import {
   getCognateRulesForDay,
   getFalseCognatesForDay,
   getCognateRulesUpToDay,
 } from "@/lib/curriculum";
-import { generateDistractors } from "@/lib/cognates";
-import { shuffle } from "@/lib/shuffle";
+import { buildExerciseQueue } from "@/lib/build-cognate-exercises";
+import type { CognateExerciseItem } from "@/lib/build-cognate-exercises";
 import { useProgressStore } from "@/stores/progress";
 import { useDayGuard } from "@/hooks/useDayGuard";
+import { useExercise } from "@/hooks/useExercise";
+import { computeScore } from "@/lib/utils";
 import { ExerciseShell } from "@/components/ExerciseShell";
 import { CognateRule } from "@/components/CognateRule";
 import { MultipleChoice } from "@/components/MultipleChoice";
@@ -17,103 +19,11 @@ import { QuizResult } from "@/components/QuizResult";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Lightbulb, ArrowRight } from "lucide-react";
-import type { SessionResult, CognateRule as CognateRuleType, FalseCognate } from "@/lib/types";
+import type { SessionResult, FalseCognate } from "@/lib/types";
 
 export const Route = createFileRoute("/day/$dayId/cognates")({
   component: CognatesPage,
 });
-
-// Exercise item types for the mixed queue
-type CognateExerciseItem =
-  | { kind: "rule-intro"; id: string; rule: CognateRuleType }
-  | {
-      kind: "type-answer";
-      id: string;
-      english: string;
-      correctSpanish: string;
-      rule: CognateRuleType;
-    }
-  | {
-      kind: "multiple-choice";
-      id: string;
-      english: string;
-      options: string[];
-      correctIndex: number;
-      rule: CognateRuleType;
-    }
-  | {
-      kind: "false-cognate";
-      id: string;
-      falseCognate: FalseCognate;
-    };
-
-function buildExerciseQueue(
-  rules: CognateRuleType[],
-  falseCognates: FalseCognate[],
-  allRules: CognateRuleType[],
-): CognateExerciseItem[] {
-  const queue: CognateExerciseItem[] = [];
-
-  for (const rule of rules) {
-    // 1. Rule introduction card
-    queue.push({ kind: "rule-intro", id: `intro-${rule.id}`, rule });
-
-    // Shuffle examples so users see different words each session
-    const shuffled = shuffle(rule.examples);
-
-    // Use 3 examples per type when enough exist, otherwise 2
-    const perType = shuffled.length >= 6 ? 3 : 2;
-
-    // Split into non-overlapping sets for type-answer vs multiple-choice
-    const typeExamples = shuffled.slice(0, perType);
-    const mcExamples = shuffled.length >= perType * 2
-      ? shuffled.slice(perType, perType * 2)
-      : shuffled.slice(0, perType);
-
-    // 2. TypeAnswer exercises
-    for (const ex of typeExamples) {
-      queue.push({
-        kind: "type-answer",
-        id: `type-${rule.id}-${ex.english}`,
-        english: ex.english,
-        correctSpanish: ex.spanish,
-        rule,
-      });
-    }
-
-    // 3. Multiple-choice exercises (different examples from type-answer)
-    for (const ex of mcExamples) {
-      const correctSpanish = ex.spanish;
-      const options = generateDistractors(correctSpanish, allRules, ex.english);
-      const correctIndex = options.indexOf(correctSpanish);
-
-      queue.push({
-        kind: "multiple-choice",
-        id: `mc-${rule.id}-${ex.english}`,
-        english: ex.english,
-        options,
-        correctIndex: correctIndex >= 0 ? correctIndex : 0,
-        rule,
-      });
-    }
-  }
-
-  // 4. Intersperse false cognate warnings
-  for (const fc of falseCognates) {
-    // Insert after the first few exercises if possible
-    const insertPos = Math.min(
-      queue.length,
-      Math.max(2, Math.floor(queue.length / (falseCognates.length + 1))),
-    );
-    queue.splice(insertPos, 0, {
-      kind: "false-cognate",
-      id: `fc-${fc.id}`,
-      falseCognate: fc,
-    });
-  }
-
-  return queue;
-}
 
 function CognatesPage() {
   const { dayId } = Route.useParams();
@@ -123,69 +33,34 @@ function CognatesPage() {
   const dayNum = Number(dayId);
   const allowed = useDayGuard(dayNum);
 
-  const rulesForDay = getCognateRulesForDay(dayNum);
-  const falseCognatesForDay = getFalseCognatesForDay(dayNum);
-  const allRulesUpToDay = getCognateRulesUpToDay(dayNum);
-
   const exerciseQueue = useMemo(
-    () => buildExerciseQueue(rulesForDay, falseCognatesForDay, allRulesUpToDay),
-    [rulesForDay, falseCognatesForDay, allRulesUpToDay],
-  );
-
-  const [index, setIndex] = useState(0);
-  const [result, setResult] = useState<SessionResult>({
-    total: 0,
-    correct: 0,
-    incorrect: 0,
-    newCards: 0,
-    reviewCards: 0,
-  });
-  const [isComplete, setIsComplete] = useState(false);
-  const resultRef = useRef(result);
-  resultRef.current = result;
-
-  const currentItem = exerciseQueue[index] ?? null;
-
-  const advance = useCallback(() => {
-    const nextIndex = index + 1;
-    if (nextIndex >= exerciseQueue.length) {
-      setIsComplete(true);
-      const latestResult = resultRef.current;
-      const score =
-        latestResult.total > 0
-          ? Math.round((latestResult.correct / latestResult.total) * 100)
-          : 0;
-      recordAttempt(dayNum, "cognates", score);
-    } else {
-      setIndex(nextIndex);
-    }
-  }, [index, exerciseQueue.length, dayNum, recordAttempt]);
-
-  const handleAnswer = useCallback(
-    (correct: boolean) => {
-      setResult((prev) => ({
-        ...prev,
-        total: prev.total + 1,
-        correct: prev.correct + (correct ? 1 : 0),
-        incorrect: prev.incorrect + (correct ? 0 : 1),
-      }));
-      // advance happens after a short delay via the child components
+    () => {
+      const rulesForDay = getCognateRulesForDay(dayNum);
+      const falseCognatesForDay = getFalseCognatesForDay(dayNum);
+      const allRulesUpToDay = getCognateRulesUpToDay(dayNum);
+      return buildExerciseQueue(rulesForDay, falseCognatesForDay, allRulesUpToDay);
     },
-    [],
+    [dayNum],
   );
 
-  const restart = useCallback(() => {
-    setIndex(0);
-    setResult({ total: 0, correct: 0, incorrect: 0, newCards: 0, reviewCards: 0 });
-    setIsComplete(false);
-  }, []);
+  const handleComplete = useCallback(
+    (result: SessionResult) => {
+      recordAttempt(dayNum, "cognates", computeScore(result));
+    },
+    [dayNum, recordAttempt],
+  );
+
+  const exercise = useExercise({
+    items: exerciseQueue,
+    onComplete: handleComplete,
+  });
 
   if (!allowed) {
     return null;
   }
 
   // No cognate rules for this day
-  if (rulesForDay.length === 0 && falseCognatesForDay.length === 0) {
+  if (exerciseQueue.length === 0) {
     return (
       <ExerciseShell
         title="Cognates"
@@ -213,7 +88,7 @@ function CognatesPage() {
     );
   }
 
-  if (isComplete) {
+  if (exercise.state === "complete") {
     return (
       <ExerciseShell
         title="Cognates"
@@ -223,8 +98,8 @@ function CognatesPage() {
         backTo={`/day/${dayNum}`}
       >
         <QuizResult
-          result={result}
-          onRestart={restart}
+          result={exercise.result}
+          onRestart={exercise.restart}
           onContinue={() => navigate({ to: `/day/${dayNum}` as string })}
           continueLabel="Back to Day"
         />
@@ -232,21 +107,23 @@ function CognatesPage() {
     );
   }
 
+  const currentItem = exercise.current;
+
   return (
     <ExerciseShell
       title="Cognates"
       subtitle={`Day ${dayNum}`}
       intro="Discover patterns that connect English and Spanish. Many English words transform into Spanish with simple suffix changes — learn the rules and unlock thousands of words instantly."
-      current={index + 1}
-      total={exerciseQueue.length}
+      current={exercise.index + 1}
+      total={exercise.total}
       backTo={`/day/${dayNum}`}
     >
       {currentItem && (
         <CognateExerciseRenderer
           key={currentItem.id}
           item={currentItem}
-          onAnswer={handleAnswer}
-          onAdvance={advance}
+          onAnswer={exercise.recordAnswer}
+          onNext={exercise.next}
         />
       )}
     </ExerciseShell>
@@ -257,11 +134,11 @@ function CognatesPage() {
 function CognateExerciseRenderer({
   item,
   onAnswer,
-  onAdvance,
+  onNext,
 }: {
   item: CognateExerciseItem;
   onAnswer: (correct: boolean) => void;
-  onAdvance: () => void;
+  onNext: () => void;
 }) {
   switch (item.kind) {
     case "rule-intro":
@@ -270,7 +147,7 @@ function CognateExerciseRenderer({
           <CognateRule rule={item.rule} />
           <div className="flex justify-center">
             <Button
-              onClick={onAdvance}
+              onClick={onNext}
               className="min-h-[44px] gap-2"
             >
               Got it
@@ -286,10 +163,7 @@ function CognateExerciseRenderer({
           question={`What is "${item.english}" in Spanish?`}
           correctAnswer={item.correctSpanish}
           hint={`Rule: ${item.rule.englishSuffix} → ${item.rule.spanishSuffix}`}
-          onAnswer={(correct) => {
-            onAnswer(correct);
-            setTimeout(onAdvance, 0);
-          }}
+          onAnswer={onAnswer}
           placeholder="Type the Spanish word..."
         />
       );
@@ -301,15 +175,12 @@ function CognateExerciseRenderer({
           options={item.options}
           correctIndex={item.correctIndex}
           hint={`Rule: ${item.rule.englishSuffix} → ${item.rule.spanishSuffix}`}
-          onAnswer={(correct) => {
-            onAnswer(correct);
-          }}
-          onNext={onAdvance}
+          onAnswer={onAnswer}
         />
       );
 
     case "false-cognate":
-      return <FalseCognateCard fc={item.falseCognate} onContinue={onAdvance} />;
+      return <FalseCognateCard fc={item.falseCognate} onContinue={onNext} />;
   }
 }
 

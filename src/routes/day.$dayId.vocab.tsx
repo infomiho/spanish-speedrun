@@ -4,6 +4,7 @@ import { getVocabForDay } from "@/lib/curriculum";
 import { useProgressStore } from "@/stores/progress";
 import { useDayGuard } from "@/hooks/useDayGuard";
 import { useSrsSession } from "@/hooks/useSrsSession";
+import { computeScore } from "@/lib/utils";
 import { ExerciseShell } from "@/components/ExerciseShell";
 import { FlashCard } from "@/components/FlashCard";
 import { QuizResult } from "@/components/QuizResult";
@@ -27,9 +28,7 @@ function VocabPage() {
 
   const handleComplete = useCallback(
     (result: SessionResult) => {
-      const score =
-        result.total > 0 ? Math.round((result.correct / result.total) * 100) : 0;
-      recordAttempt(dayNum, "vocab", score);
+      recordAttempt(dayNum, "vocab", computeScore(result));
     },
     [dayNum, recordAttempt],
   );
