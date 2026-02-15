@@ -119,12 +119,7 @@ export function SentenceBuilder({
                     String.fromCharCode(65 + i)
                   )}
                 </span>
-                <span>
-                  {word.spanish}
-                  <span className="ml-1.5 text-xs text-muted-foreground">
-                    ({word.english})
-                  </span>
-                </span>
+                <span>{word.spanish}</span>
               </Button>
             );
           })}
