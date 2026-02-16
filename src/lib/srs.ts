@@ -101,3 +101,21 @@ export function getDueCards(cards: SrsCard[]): SrsCard[] {
 export function getNewCards(cards: SrsCard[]): SrsCard[] {
   return cards.filter((c) => c.repetitions === 0 && c.dueAt === 0);
 }
+
+export const MAX_REVIEW_PER_SESSION = 30;
+
+export interface ReviewSession {
+  sessionCards: SrsCard[];
+  totalDue: number;
+}
+
+export function buildReviewSession(
+  cards: SrsCard[],
+  limit = MAX_REVIEW_PER_SESSION,
+): ReviewSession {
+  const allDue = getDueCards(cards);
+  return {
+    sessionCards: allDue.slice(0, limit),
+    totalDue: allDue.length,
+  };
+}

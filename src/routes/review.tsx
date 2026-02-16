@@ -6,6 +6,7 @@ import { QuizResult } from "@/components/QuizResult";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Inbox, Square } from "lucide-react";
+import { buildReviewSession } from "@/lib/srs";
 import type { SrsCard, SrsQuality, SessionResult } from "@/lib/types";
 
 export const Route = createFileRoute("/review")({
@@ -14,10 +15,13 @@ export const Route = createFileRoute("/review")({
 
 function ReviewPage() {
   const navigate = useNavigate();
+  const allCards = useSrsStore((s) => Object.values(s.cards));
   const getDueCards = useSrsStore((s) => s.getDueCards);
   const reviewCard = useSrsStore((s) => s.review);
 
-  const [sessionCards] = useState<SrsCard[]>(() => getDueCards());
+  const [{ sessionCards, totalDue }] = useState(() =>
+    buildReviewSession(allCards),
+  );
   const [index, setIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isComplete, setIsComplete] = useState(sessionCards.length === 0);
@@ -117,7 +121,9 @@ function ReviewPage() {
         <div className="flex-1">
           <h2 className="font-semibold text-sm">SRS Review</h2>
           <p className="text-xs text-muted-foreground">
-            {sessionCards.length} cards due
+            {totalDue > sessionCards.length
+              ? `${sessionCards.length} of ${totalDue} cards due`
+              : `${sessionCards.length} cards due`}
           </p>
         </div>
         <Badge variant="secondary" className="tabular-nums">

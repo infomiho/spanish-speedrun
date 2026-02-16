@@ -5,6 +5,8 @@ import {
   isDue,
   getDueCards,
   getNewCards,
+  buildReviewSession,
+  MAX_REVIEW_PER_SESSION,
 } from "@/lib/srs";
 import type { SrsCard, SrsQuality } from "@/lib/types";
 
@@ -174,5 +176,88 @@ describe("getNewCards", () => {
 
     const newCards = getNewCards(cards);
     expect(newCards.map((c) => c.id)).toEqual(["new1", "new2"]);
+  });
+});
+
+describe("buildReviewSession", () => {
+  it("caps session at MAX_REVIEW_PER_SESSION", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const cards = Array.from({ length: 50 }, (_, i) =>
+      makeCard({ id: `c${i}`, dueAt: NOW - (50 - i) }),
+    );
+
+    const session = buildReviewSession(cards);
+    expect(session.sessionCards).toHaveLength(MAX_REVIEW_PER_SESSION);
+    expect(session.totalDue).toBe(50);
+  });
+
+  it("returns all cards when fewer than limit", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const cards = [
+      makeCard({ id: "a", dueAt: NOW - 100 }),
+      makeCard({ id: "b", dueAt: NOW - 50 }),
+    ];
+
+    const session = buildReviewSession(cards);
+    expect(session.sessionCards).toHaveLength(2);
+    expect(session.totalDue).toBe(2);
+  });
+
+  it("excludes cards that are not yet due", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const cards = [
+      makeCard({ id: "due", dueAt: NOW - 100 }),
+      makeCard({ id: "not-due", dueAt: NOW + 9999 }),
+    ];
+
+    const session = buildReviewSession(cards);
+    expect(session.sessionCards).toHaveLength(1);
+    expect(session.sessionCards[0].id).toBe("due");
+    expect(session.totalDue).toBe(1);
+  });
+
+  it("returns empty session when no cards are due", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const cards = [
+      makeCard({ id: "a", dueAt: NOW + 1000 }),
+      makeCard({ id: "b", dueAt: NOW + 2000 }),
+    ];
+
+    const session = buildReviewSession(cards);
+    expect(session.sessionCards).toHaveLength(0);
+    expect(session.totalDue).toBe(0);
+  });
+
+  it("accepts a custom limit", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const cards = Array.from({ length: 20 }, (_, i) =>
+      makeCard({ id: `c${i}`, dueAt: NOW - i }),
+    );
+
+    const session = buildReviewSession(cards, 5);
+    expect(session.sessionCards).toHaveLength(5);
+    expect(session.totalDue).toBe(20);
+  });
+
+  it("preserves due-date ordering (most overdue first)", () => {
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const cards = [
+      makeCard({ id: "recent", dueAt: NOW - 10 }),
+      makeCard({ id: "oldest", dueAt: NOW - 1000 }),
+      makeCard({ id: "middle", dueAt: NOW - 500 }),
+    ];
+
+    const session = buildReviewSession(cards);
+    expect(session.sessionCards.map((c) => c.id)).toEqual([
+      "oldest",
+      "middle",
+      "recent",
+    ]);
   });
 });
