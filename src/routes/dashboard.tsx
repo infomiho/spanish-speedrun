@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Rocket, RefreshCcw, BookOpen, Puzzle, MessageSquare, Zap, Trophy, ArrowRight, Clock, Brain } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings";
 import { useSrsStore } from "@/stores/srs";
-import { getDueCards as getDueCardsLib } from "@/lib/srs";
+import { getDueCards as getDueCardsLib, MAX_REVIEW_PER_SESSION } from "@/lib/srs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StreakCounter } from "@/components/StreakCounter";
@@ -21,6 +21,7 @@ function DashboardPage() {
     () => getDueCardsLib(Object.values(cards)).length,
     [cards],
   );
+  const sessionSize = Math.min(dueCount, MAX_REVIEW_PER_SESSION);
 
   if (!startDate) {
     return <Onboarding onStart={startJourney} />;
@@ -34,7 +35,7 @@ function DashboardPage() {
         <Button asChild size="lg" className="min-h-[44px] w-full gap-2 text-base">
           <Link to="/review">
             <RefreshCcw className="h-5 w-5" />
-            Review Due ({dueCount})
+            Review Due ({sessionSize}{dueCount > sessionSize ? ` of ${dueCount}` : ""})
           </Link>
         </Button>
       )}

@@ -15,12 +15,10 @@ export const Route = createFileRoute("/review")({
 
 function ReviewPage() {
   const navigate = useNavigate();
-  const allCards = useSrsStore((s) => Object.values(s.cards));
-  const getDueCards = useSrsStore((s) => s.getDueCards);
   const reviewCard = useSrsStore((s) => s.review);
 
   const [{ sessionCards, totalDue }] = useState(() =>
-    buildReviewSession(allCards),
+    buildReviewSession(Object.values(useSrsStore.getState().cards)),
   );
   const [index, setIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -65,8 +63,9 @@ function ReviewPage() {
   };
 
   const handleRestart = () => {
-    const freshDue = getDueCards();
-    if (freshDue.length === 0) {
+    const { cards } = useSrsStore.getState();
+    const { totalDue } = buildReviewSession(Object.values(cards));
+    if (totalDue === 0) {
       setIsComplete(true);
       return;
     }
